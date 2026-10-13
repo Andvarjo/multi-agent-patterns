@@ -37,7 +37,8 @@ instead of listing them as separate sentences.
 - If not all points fit within the word limit, prioritize the most important ones and drop minor details.
 
 Constraints:
-- Use only the information in the key points. Do not add facts, context, or opinions."""
+- Use only the information in the key points. Do not add facts, context, or opinions.
+- Return plain text only, with no XML tags, markdown, or headings."""
 
 
 EDITOR_PROMPT = """You are the final step in a summarization pipeline. You receive a draft summary \
@@ -51,7 +52,8 @@ Your job is to improve clarity and concision:
 Constraints:
 - Do not add, remove, or change any facts, numbers, or claims.
 - If the draft is already clear and concise, return it with minimal changes.
-- Return only the final paragraph, with no introduction or comments about your edits."""
+- Return only the final paragraph, with no introduction or comments about your edits.
+- Return plain text only, with no XML tags, markdown, or headings."""
 
 
 def extractor(state: PipelineState) -> dict:
