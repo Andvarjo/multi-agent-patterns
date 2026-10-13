@@ -1,4 +1,8 @@
+from pathlib import Path
+
 from core.llm import LLMUsage, call_llm, get_model
+
+ARTICLES_PATH = Path(__file__).parent / "data" / "articles.jsonl"
 
 BASELINE_PROMPT = """You summarize technical articles. The article is provided inside <article> tags.
 
@@ -31,13 +35,19 @@ def run_baseline(article: str) -> tuple[str, list[LLMUsage]]:
 
 
 if __name__ == "__main__":
-    sample = (
-        "We migrated our API from REST to gRPC. p95 latency dropped from 120 ms to 45 ms, "
-        "and payload size fell by 60%. The main cost was rewriting three client SDKs, "
-        "which took the team six weeks."
-    )
-    summary, usage = run_baseline(sample)
+    import sys
+    from pathlib import Path
 
+    from core.data import load_jsonl
+
+    dataset = load_jsonl(Path(__file__).parent / "data" / "articles.jsonl")
+    case_id = sys.argv[1] if len(sys.argv) > 1 else dataset[0]["id"]
+    case = next(c for c in dataset if c["id"] == case_id)
+
+    summary, usage = run_baseline(case["article"])
+
+    print(f"Case: {case['id']} ({case['length']}, {case['word_count']} words)\n")
     print(summary)
     print()
-    print(usage)
+    for record in usage:
+        print(record)
