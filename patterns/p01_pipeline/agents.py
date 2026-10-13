@@ -60,11 +60,13 @@ def extractor(state: PipelineState) -> dict:
     response, usage = llm.call_llm(model, EXTRACTOR_PROMPT, user_message, "extractor")
     return {"key_points": response, "usage": [usage]}
 
+
 def writer(state: PipelineState) -> dict:
     key_points = state["key_points"]
     user_message = f"<key_points>\n{key_points}\n</key_points>"
     response, usage = llm.call_llm(model, WRITER_PROMPT, user_message, "writer")
     return {"draft": response, "usage": [usage]}
+
 
 def editor(state: PipelineState) -> dict:
     draft = state["draft"]

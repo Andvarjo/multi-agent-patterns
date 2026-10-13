@@ -1,9 +1,9 @@
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
-from patterns.p01_pipeline.state import PipelineState
-from patterns.p01_pipeline.agents import extractor, writer, editor
-from core.llm import LLMUsage
 
+from core.llm import LLMUsage
+from patterns.p01_pipeline.agents import editor, extractor, writer
+from patterns.p01_pipeline.state import PipelineState
 
 
 def build_graph() -> CompiledStateGraph:
@@ -19,6 +19,7 @@ def build_graph() -> CompiledStateGraph:
     graph.add_edge("editor", END)
 
     return graph.compile()
+
 
 graph = build_graph()
 
