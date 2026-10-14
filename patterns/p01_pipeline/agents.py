@@ -1,7 +1,7 @@
 from core import llm
 from patterns.p01_pipeline.state import PipelineState
 
-model = llm.get_model()
+model = llm.get_model("worker")
 
 
 EXTRACTOR_PROMPT = """You are the first step in a summarization pipeline. Your output is not shown \

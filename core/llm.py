@@ -2,7 +2,7 @@
 
 import os
 import time
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
@@ -18,9 +18,20 @@ class LLMUsage(TypedDict):
     latency_s: float
 
 
-def get_model() -> ChatAnthropic:
-    """Build the worker model from the WORKER_MODEL environment variable."""
-    return ChatAnthropic(model=os.environ["WORKER_MODEL"])
+ModelRole = Literal["worker", "judge"]
+
+_ENV_VARS: dict[ModelRole, str] = {
+    "worker": "WORKER_MODEL",
+    "judge": "JUDGE_MODEL",
+}
+
+
+def get_model(role: ModelRole = "worker") -> ChatAnthropic:
+    """Build the model for the given role, reading its name from the environment.
+
+    "worker" is used by the agents under test; "judge" is a stronger model used to evaluate them.
+    """
+    return ChatAnthropic(model=os.environ[_ENV_VARS[role]])
 
 
 def _to_text(content: str | list) -> str:
@@ -60,7 +71,7 @@ def call_llm(
 
 if __name__ == "__main__":
     text, metrics = call_llm(
-        model=get_model(),
+        model=get_model("worker"),
         system_prompt="You are a concise technical assistant.",
         user_message="Explain what a multi-agent system is in one sentence.",
         agent_name="smoke_test",

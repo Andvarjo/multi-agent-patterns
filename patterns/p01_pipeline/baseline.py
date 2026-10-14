@@ -26,7 +26,7 @@ def run_baseline(article: str) -> tuple[str, list[LLMUsage]]:
     """Run the baseline to compare"""
     user_message = f"<article>\n{article}\n</article>"
     text, metrics = call_llm(
-        model=get_model(),
+        model=get_model("worker"),
         system_prompt=BASELINE_PROMPT,
         user_message=user_message,
         agent_name="baseline",
