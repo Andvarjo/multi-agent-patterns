@@ -222,3 +222,7 @@ __marimo__/
 # Claude Code (personal, not versioned)
 .claude/settings.local.json
 CLAUDE.local.md
+
+# directories
+results/
+scratch/
