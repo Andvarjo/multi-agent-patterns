@@ -13,6 +13,7 @@ load_dotenv()
 
 class LLMUsage(TypedDict):
     agent: str
+    model: str
     input_tokens: int
     output_tokens: int
     latency_s: float
@@ -62,6 +63,7 @@ def call_llm(
     usage = response.usage_metadata or {}
     metrics: LLMUsage = {
         "agent": agent_name,
+        "model": model.model,
         "input_tokens": usage.get("input_tokens", 0),
         "output_tokens": usage.get("output_tokens", 0),
         "latency_s": round(latency, 3),
