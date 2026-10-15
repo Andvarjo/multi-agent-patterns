@@ -100,8 +100,8 @@ uv run python -m patterns.p01_pipeline.run                # full evaluation
 
 I'm Andrés Felipe Varela, a Senior AI Engineer working on LLM systems in production. I built this repo to go deeper into multi-agent architectures with an engineering mindset: build each pattern, measure it honestly, and document when it helps and when it doesn't.
 
-- LinkedIn: `www.linkedin.com/in/andresvj`
-- Contact: `andresvarela92@hotmail.com`
+- LinkedIn: [Andrés Felipe Varela](https://www.linkedin.com/in/andresvj/)
+- Email: [andresvarela92@hotmail.com](mailto:andresvarela92@hotmail.com)
 
 Feedback, questions and discussion are welcome through GitHub issues.
 
