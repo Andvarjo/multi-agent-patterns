@@ -6,6 +6,7 @@ The harness knows nothing about pipelines or summaries. It only needs:
 """
 
 import json
+import statistics
 import time
 from collections.abc import Callable
 from datetime import datetime
@@ -96,3 +97,44 @@ def run_eval(
 
     print(f"Done. Results saved to {out_path}")
     return records
+
+
+def summarize(records: list[dict]) -> list[dict]:
+    """Aggregate records per system: mean scores, score spread across runs, tokens, latency, errors."""
+    rows = []
+    for system_name in dict.fromkeys(r["system"] for r in records):
+        system_records = [r for r in records if r["system"] == system_name]
+        ok = [r for r in system_records if r["error"] is None and r["judge_error"] is None]
+
+        criteria = [k for k, v in ok[0]["scores"].items() if isinstance(v, int)] if ok else []
+        row: dict = {"system": system_name}
+        for criterion in criteria:
+            row[criterion] = float(statistics.mean(r["scores"][criterion] for r in ok))
+
+        per_run_avg = [statistics.mean(r["scores"][c] for c in criteria) for r in ok] if criteria else []
+        row["avg_score"] = statistics.mean(per_run_avg) if per_run_avg else 0.0
+        row["score_std"] = statistics.stdev(per_run_avg) if len(per_run_avg) > 1 else 0.0
+        row["llm_calls"] = float(statistics.mean(len(r["usage"]) for r in ok)) if ok else 0.0
+        row["input_tokens"] = float(statistics.mean(r["input_tokens"] for r in ok)) if ok else 0.0
+        row["output_tokens"] = float(statistics.mean(r["output_tokens"] for r in ok)) if ok else 0.0
+        row["latency_s"] = statistics.mean(r["latency_s"] for r in ok) if ok else 0.0
+        row["runs"] = len(system_records)
+        row["errors"] = len(system_records) - len(ok)
+        rows.append(row)
+    return rows
+
+
+def print_table(rows: list[dict]) -> None:
+    """Print the per-system summary as an aligned text table."""
+    if not rows:
+        print("No results.")
+        return
+    # Union of columns across systems, in first-seen order (a fully failed system has no scores).
+    columns = list(dict.fromkeys(c for row in rows for c in row if c != "system"))
+    print("system".ljust(12) + "".join(c.rjust(14) for c in columns))
+    for row in rows:
+        cells = []
+        for c in columns:
+            value = row.get(c, "-")
+            cells.append(f"{value:.2f}" if isinstance(value, float) else str(value))
+        print(row["system"].ljust(12) + "".join(cell.rjust(14) for cell in cells))
