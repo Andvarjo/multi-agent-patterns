@@ -100,41 +100,42 @@ def run_eval(
     print(f"Done. Results saved to {out_path}")
     return records
 
+def _is_grade(value) -> bool:
+    """1-5 style scores: integers, but not booleans (bool is a subclass of int)."""
+    return isinstance(value, int) and not isinstance(value, bool)
 
 def summarize(records: list[dict]) -> list[dict]:
-    """Aggregate records per system: mean scores, score spread across runs, tokens, latency, errors."""
+    """Aggregate records per system.
+
+    - Grades (non-boolean ints, e.g. 1-5 scores) are averaged and combined into avg_score.
+    - Flags (booleans, e.g. route_correct) are reported as rates, separately from avg_score,
+      computed only over the records that contain them.
+    """
     rows = []
     for system_name in dict.fromkeys(r["system"] for r in records):
         system_records = [r for r in records if r["system"] == system_name]
-        ok = [
-            r for r in system_records if r["error"] is None and r["judge_error"] is None
-        ]
+        ok = [r for r in system_records if r["error"] is None and r["judge_error"] is None]
 
-        criteria = (
-            [k for k, v in ok[0]["scores"].items() if isinstance(v, int)] if ok else []
-        )
+        grades = [k for k, v in ok[0]["scores"].items() if _is_grade(v)] if ok else []
+        flags = list(dict.fromkeys(
+            k for r in ok for k, v in r["scores"].items() if isinstance(v, bool)
+        ))
+
         row: dict = {"system": system_name}
-        for criterion in criteria:
-            row[criterion] = float(statistics.mean(r["scores"][criterion] for r in ok))
+        for grade in grades:
+            row[grade] = float(statistics.mean(r["scores"][grade] for r in ok))
 
-        per_run_avg = (
-            [statistics.mean(r["scores"][c] for c in criteria) for r in ok]
-            if criteria
-            else []
-        )
+        per_run_avg = [statistics.mean(r["scores"][g] for g in grades) for r in ok] if grades else []
         row["avg_score"] = statistics.mean(per_run_avg) if per_run_avg else 0.0
-        row["score_std"] = (
-            statistics.stdev(per_run_avg) if len(per_run_avg) > 1 else 0.0
-        )
-        row["llm_calls"] = (
-            float(statistics.mean(len(r["usage"]) for r in ok)) if ok else 0.0
-        )
-        row["input_tokens"] = (
-            float(statistics.mean(r["input_tokens"] for r in ok)) if ok else 0.0
-        )
-        row["output_tokens"] = (
-            float(statistics.mean(r["output_tokens"] for r in ok)) if ok else 0.0
-        )
+        row["score_std"] = statistics.stdev(per_run_avg) if len(per_run_avg) > 1 else 0.0
+
+        for flag in flags:
+            values = [r["scores"][flag] for r in ok if flag in r["scores"]]
+            row[f"{flag}_rate"] = float(statistics.mean(values))
+
+        row["llm_calls"] = float(statistics.mean(len(r["usage"]) for r in ok)) if ok else 0.0
+        row["input_tokens"] = float(statistics.mean(r["input_tokens"] for r in ok)) if ok else 0.0
+        row["output_tokens"] = float(statistics.mean(r["output_tokens"] for r in ok)) if ok else 0.0
         row["latency_s"] = statistics.mean(r["latency_s"] for r in ok) if ok else 0.0
         row["runs"] = len(system_records)
         row["errors"] = len(system_records) - len(ok)
