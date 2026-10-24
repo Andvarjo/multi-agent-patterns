@@ -39,10 +39,10 @@ def main() -> None:
         records = run_eval(
             name="p01_pipeline",
             systems={
-                "pipeline": lambda case: run_pipeline(case["article"]),
-                "baseline": lambda case: run_baseline(case["article"]),
+                "pipeline": lambda case: (*run_pipeline(case["article"]), {}),
+                "baseline": lambda case: (*run_baseline(case["article"]), {}),
             },
-            judge=lambda case, output: judge_summary(case["article"], output),
+            judge=lambda case, output, metadata: judge_summary(case["article"], output),
             dataset=dataset,
             runs=args.runs,
         )

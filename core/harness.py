@@ -1,8 +1,10 @@
 """Generic evaluation harness shared by all patterns.
 
-The harness knows nothing about pipelines or summaries. It only needs:
-- a System: takes a dataset case and returns (output, per-agent usage).
-- a Judge: takes the case and the output and returns a dict of scores.
+The harness knows nothing about pipelines, summaries or routes. It only needs:
+- a System: takes a dataset case and returns (output, per-agent usage, metadata).
+  Metadata is a free-form dict for anything a system wants to report besides its output,
+  such as the route a router chose. Systems with nothing extra return {}.
+- a Judge: takes the case, the output and the metadata, and returns a dict of scores.
 """
 
 import json
@@ -14,8 +16,8 @@ from pathlib import Path
 
 from core.llm import LLMUsage
 
-System = Callable[[dict], tuple[str, list[LLMUsage]]]
-Judge = Callable[[dict, str], dict]
+System = Callable[[dict], tuple[str, list[LLMUsage], dict]]
+Judge = Callable[[dict, str, dict], dict]
 
 
 def run_one(
@@ -28,17 +30,17 @@ def run_one(
     """Run one system on one case once, judge the output, and return a result record."""
     start = time.perf_counter()
     try:
-        output, usage = system(case)
+        output, usage, metadata = system(case)
         error = None
     except Exception as e:  # a failed run is a result, not a crash
-        output, usage, error = "", [], repr(e)
+        output, usage, metadata, error = "", [], {}, repr(e)
     latency = time.perf_counter() - start
 
     scores: dict = {}
     judge_error = None
     if error is None:
         try:
-            scores = judge(case, output)
+            scores = judge(case, output, metadata)
         except Exception as e:
             judge_error = repr(e)
 
@@ -47,6 +49,7 @@ def run_one(
         "system": system_name,
         "run": run_index,
         "output": output,
+        "metadata": metadata,
         "scores": scores,
         "input_tokens": sum(u["input_tokens"] for u in usage),
         "output_tokens": sum(u["output_tokens"] for u in usage),
@@ -55,7 +58,6 @@ def run_one(
         "error": error,
         "judge_error": judge_error,
     }
-
 
 def run_eval(
     name: str,
