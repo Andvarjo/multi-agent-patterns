@@ -1,6 +1,7 @@
+from pathlib import Path
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
-from pathlib import Path
 
 from core.llm import get_model
 
