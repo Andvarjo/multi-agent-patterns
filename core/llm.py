@@ -19,11 +19,12 @@ class LLMUsage(TypedDict):
     latency_s: float
 
 
-ModelRole = Literal["worker", "judge"]
+ModelRole = Literal["worker", "judge", "router"]
 
 _ENV_VARS: dict[ModelRole, str] = {
     "worker": "WORKER_MODEL",
     "judge": "JUDGE_MODEL",
+    "router": "ROUTER_MODEL",
 }
 
 

@@ -1,8 +1,10 @@
 """Generic evaluation harness shared by all patterns.
 
-The harness knows nothing about pipelines or summaries. It only needs:
-- a System: takes a dataset case and returns (output, per-agent usage).
-- a Judge: takes the case and the output and returns a dict of scores.
+The harness knows nothing about pipelines, summaries or routes. It only needs:
+- a System: takes a dataset case and returns (output, per-agent usage, metadata).
+  Metadata is a free-form dict for anything a system wants to report besides its output,
+  such as the route a router chose. Systems with nothing extra return {}.
+- a Judge: takes the case, the output and the metadata, and returns a dict of scores.
 """
 
 import json
@@ -14,8 +16,8 @@ from pathlib import Path
 
 from core.llm import LLMUsage
 
-System = Callable[[dict], tuple[str, list[LLMUsage]]]
-Judge = Callable[[dict, str], dict]
+System = Callable[[dict], tuple[str, list[LLMUsage], dict]]
+Judge = Callable[[dict, str, dict], dict]
 
 
 def run_one(
@@ -28,17 +30,17 @@ def run_one(
     """Run one system on one case once, judge the output, and return a result record."""
     start = time.perf_counter()
     try:
-        output, usage = system(case)
+        output, usage, metadata = system(case)
         error = None
     except Exception as e:  # a failed run is a result, not a crash
-        output, usage, error = "", [], repr(e)
+        output, usage, metadata, error = "", [], {}, repr(e)
     latency = time.perf_counter() - start
 
     scores: dict = {}
     judge_error = None
     if error is None:
         try:
-            scores = judge(case, output)
+            scores = judge(case, output, metadata)
         except Exception as e:
             judge_error = repr(e)
 
@@ -47,6 +49,7 @@ def run_one(
         "system": system_name,
         "run": run_index,
         "output": output,
+        "metadata": metadata,
         "scores": scores,
         "input_tokens": sum(u["input_tokens"] for u in usage),
         "output_tokens": sum(u["output_tokens"] for u in usage),
@@ -55,7 +58,6 @@ def run_one(
         "error": error,
         "judge_error": judge_error,
     }
-
 
 def run_eval(
     name: str,
@@ -98,22 +100,39 @@ def run_eval(
     print(f"Done. Results saved to {out_path}")
     return records
 
+def _is_grade(value) -> bool:
+    """1-5 style scores: integers, but not booleans (bool is a subclass of int)."""
+    return isinstance(value, int) and not isinstance(value, bool)
 
 def summarize(records: list[dict]) -> list[dict]:
-    """Aggregate records per system: mean scores, score spread across runs, tokens, latency, errors."""
+    """Aggregate records per system.
+
+    - Grades (non-boolean ints, e.g. 1-5 scores) are averaged and combined into avg_score.
+    - Flags (booleans, e.g. route_correct) are reported as rates, separately from avg_score,
+      computed only over the records that contain them.
+    """
     rows = []
     for system_name in dict.fromkeys(r["system"] for r in records):
         system_records = [r for r in records if r["system"] == system_name]
         ok = [r for r in system_records if r["error"] is None and r["judge_error"] is None]
 
-        criteria = [k for k, v in ok[0]["scores"].items() if isinstance(v, int)] if ok else []
-        row: dict = {"system": system_name}
-        for criterion in criteria:
-            row[criterion] = float(statistics.mean(r["scores"][criterion] for r in ok))
+        grades = [k for k, v in ok[0]["scores"].items() if _is_grade(v)] if ok else []
+        flags = list(dict.fromkeys(
+            k for r in ok for k, v in r["scores"].items() if isinstance(v, bool)
+        ))
 
-        per_run_avg = [statistics.mean(r["scores"][c] for c in criteria) for r in ok] if criteria else []
+        row: dict = {"system": system_name}
+        for grade in grades:
+            row[grade] = float(statistics.mean(r["scores"][grade] for r in ok))
+
+        per_run_avg = [statistics.mean(r["scores"][g] for g in grades) for r in ok] if grades else []
         row["avg_score"] = statistics.mean(per_run_avg) if per_run_avg else 0.0
         row["score_std"] = statistics.stdev(per_run_avg) if len(per_run_avg) > 1 else 0.0
+
+        for flag in flags:
+            values = [r["scores"][flag] for r in ok if flag in r["scores"]]
+            row[f"{flag}_rate"] = float(statistics.mean(values))
+
         row["llm_calls"] = float(statistics.mean(len(r["usage"]) for r in ok)) if ok else 0.0
         row["input_tokens"] = float(statistics.mean(r["input_tokens"] for r in ok)) if ok else 0.0
         row["output_tokens"] = float(statistics.mean(r["output_tokens"] for r in ok)) if ok else 0.0

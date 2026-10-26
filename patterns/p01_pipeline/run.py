@@ -21,8 +21,15 @@ DATA_PATH = Path(__file__).parent / "data" / "articles.jsonl"
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate pattern 1.")
     parser.add_argument("--runs", type=int, default=3, help="Runs per case and system.")
-    parser.add_argument("--limit", type=int, default=None, help="Only use the first N cases.")
-    parser.add_argument("--from-file", type=Path, default=None, help="Summarize an existing results file.")
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Only use the first N cases."
+    )
+    parser.add_argument(
+        "--from-file",
+        type=Path,
+        default=None,
+        help="Summarize an existing results file.",
+    )
     args = parser.parse_args()
 
     if args.from_file:
@@ -32,10 +39,10 @@ def main() -> None:
         records = run_eval(
             name="p01_pipeline",
             systems={
-                "pipeline": lambda case: run_pipeline(case["article"]),
-                "baseline": lambda case: run_baseline(case["article"]),
+                "pipeline": lambda case: (*run_pipeline(case["article"]), {}),
+                "baseline": lambda case: (*run_baseline(case["article"]), {}),
             },
-            judge=lambda case, output: judge_summary(case["article"], output),
+            judge=lambda case, output, metadata: judge_summary(case["article"], output),
             dataset=dataset,
             runs=args.runs,
         )
