@@ -181,6 +181,7 @@ In Pattern 01, splitting the work cost more and produced worse results. Here, sp
 | `data/questions.jsonl` | Evaluation dataset (30 questions) |
 | `data/knowledge/` | One knowledge base per specialist |
 | `results/` | Raw results of the evaluation reported above |
+| `bonus_jev.py` | Bonus: LLM router vs. Jev on the routing step |
 
 ## Running
 
@@ -202,8 +203,26 @@ uv run python -m patterns.p02_router.run --limit 3 --runs 1
 
 # Recompute the table from saved results, without calling any model
 uv run python -m patterns.p02_router.run --from-file patterns/p02_router/results/p02_router_20261024_202218.jsonl
+
+# Bonus: compare the LLM router with Jev (requires TYPESAFE_API_KEY)
+uv run python -m patterns.p02_router.bonus_jev
 ```
 
 ## Bonus: an LLM router vs. a decision model
 
-> Coming next. Finding 1 shows that the routing step accounts for about half of the latency and most of the extra output tokens. This bonus replaces the LLM router with Jev, a structured decision model from TypeSafe that returns a choice with probabilities instead of generating text, and compares the two on routing accuracy, routing latency, agreement, and whether Jev's confidence flags its own mistakes.
+Finding 1 shows that the routing step accounts for about half of the system's latency. This bonus replaces the LLM router with **Jev** (`jev-1.13.0`, pinned), a structured decision model from TypeSafe that returns a choice with probabilities and a confidence score instead of generating text.
+
+**Setup.** `bonus_jev.py` sends the same 30 questions to both routers and checks each route against the dataset. Jev's question uses the same route descriptions and tie-breaking rule as the LLM router's prompt. Specialists and the judge are left out: they would be identical in both setups, so only the routing decision changes. One run per question, alternating which router goes first.
+
+| Router | Exact route | Acceptable route | Median latency | Mean latency |
+|--------|------------:|-----------------:|---------------:|-------------:|
+| LLM (`claude-haiku-5-5`) | 100% | 100% | 1.74 s | 1.84 s |
+| Jev (`jev-1.13.0`) | 100% | 100% | **0.14 s** | **0.15 s** |
+
+**1. Jev routes about 12x faster, with the same accuracy.** Both routers agreed on all 30 questions. Since routing was about half of the router system's latency, a decision model would bring that system close to the single-agent baseline's latency while keeping its input-token savings. Token counts are not compared here: each model has its own tokenizer and price per token, so the numbers are not equivalent.
+
+**2. Jev's confidence flagged the one question that went wrong in the main evaluation.** Jev was at least 0.96 confident on 29 of 30 questions. The exception was "I downgraded to Free and now my teammates can't log in": confidence **0.60**, with 70% on `billing` and **29% on `account`**. That is the exact question the LLM router sent to `account` in the main evaluation, producing the worst answer of the whole run. With an escalation threshold of 0.9, Jev would have flagged exactly 1 question out of 30, and it would have been the trap.
+
+This is something the LLM router cannot offer. It produced its longest reasoning on that same question, a sign that it was also unsure, but reasoning length is not a calibrated signal that code can act on. A confidence score is: route automatically when it is high, and escalate to a stronger router, a clarifying question or a human when it is low.
+
+**Limitations.** One run of 30 questions. Neither router made a mistake in this run, so Jev's calibration could not be tested against actual errors; the confidence signal is promising on one case, not proven. Latency includes the network round trip to each provider. Vendor-reported speed and cost figures for Jev were not used; only what was measured here.
