@@ -25,7 +25,9 @@ def build_graph() -> CompiledStateGraph:
     builder.add_node("out_of_scope", out_of_scope)
 
     builder.add_edge(START, "router")
-    builder.add_conditional_edges("router", select_route, {name: name for name in SPECIALISTS})
+    builder.add_conditional_edges(
+        "router", select_route, {name: name for name in SPECIALISTS}
+    )
     for name in SPECIALISTS:
         builder.add_edge(name, END)
 

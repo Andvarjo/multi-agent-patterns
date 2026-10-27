@@ -34,8 +34,15 @@ def baseline_system(case: dict) -> tuple[str, list[LLMUsage], dict]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate pattern 2.")
     parser.add_argument("--runs", type=int, default=3, help="Runs per case and system.")
-    parser.add_argument("--limit", type=int, default=None, help="Only use the first N cases.")
-    parser.add_argument("--from-file", type=Path, default=None, help="Summarize an existing results file.")
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Only use the first N cases."
+    )
+    parser.add_argument(
+        "--from-file",
+        type=Path,
+        default=None,
+        help="Summarize an existing results file.",
+    )
     args = parser.parse_args()
 
     if args.from_file:

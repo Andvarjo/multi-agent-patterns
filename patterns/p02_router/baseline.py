@@ -36,12 +36,10 @@ explain that you can only help with questions about using Ledgerly, and do not a
 - Answer only what was asked. Do not add related policies, settings or tips the customer did not ask about."""
 
 
-
 AREAS = ("billing", "technical", "account")
 
 knowledge = {
-    area: (KNOWLEDGE_PATH / f"{area}.md").read_text(encoding="utf-8")
-    for area in AREAS
+    area: (KNOWLEDGE_PATH / f"{area}.md").read_text(encoding="utf-8") for area in AREAS
 }
 SYSTEM_PROMPT = BASELINE_PROMPT.format(**knowledge)
 
@@ -50,6 +48,7 @@ def run_baseline(question: str) -> tuple[str, list[LLMUsage]]:
     user_message = f"<question>\n{question}\n</question>"
     answer, usage = llm.call_llm(model, SYSTEM_PROMPT, user_message, "baseline")
     return answer, [usage]
+
 
 if __name__ == "__main__":
     answer, usage = run_baseline("If I delete my account, do I get a refund?")

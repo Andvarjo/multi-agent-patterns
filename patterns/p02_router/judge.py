@@ -37,16 +37,24 @@ class AnswerScore(BaseModel):
         description="Critique of the summary against each criterion, written before scoring."
     )
     completeness: int = Field(
-        ge=1, le=5, description="Includes all required facts.(or in out of scope questions, follows the expected behavior.)"
+        ge=1,
+        le=5,
+        description="Includes all required facts.(or in out of scope questions, follows the expected behavior.)",
     )
     correctness: int = Field(
-        ge=1, le=5, description="All affirmations are consistent with their reference and don't add policies, numbers or features."
+        ge=1,
+        le=5,
+        description="All affirmations are consistent with their reference and don't add policies, numbers or features.",
     )
     concision: int = Field(
-        ge=1, le=5, description="answers the question without unnecessary information and at most x limit of words."
+        ge=1,
+        le=5,
+        description="answers the question without unnecessary information and at most x limit of words.",
     )
 
+
 judge = get_model("judge").with_structured_output(AnswerScore, method="json_schema")
+
 
 def _reference(case: dict) -> str:
     """Return the reference for a case: the facts an answer must include, or the expected behavior."""
@@ -54,6 +62,7 @@ def _reference(case: dict) -> str:
         facts = "\n".join(f"- {fact}" for fact in case["required_facts"])
         return f"The answer must include:\n{facts}"
     return f"Expected behavior: {case['expected_behavior']}"
+
 
 def judge_answer(case: dict, output: str, metadata: dict) -> dict:
     """Score a support answer against the case's reference, plus routing accuracy when available."""
@@ -63,10 +72,12 @@ def judge_answer(case: dict, output: str, metadata: dict) -> dict:
         f"<requirements>\n{_reference(case)}\n</requirements>\n\n"
         f"<answer>\n{output}\n</answer>"
     )
-    score = judge.invoke([
-        SystemMessage(content=JUDGE_PROMPT),
-        HumanMessage(content=user_message),
-    ])
+    score = judge.invoke(
+        [
+            SystemMessage(content=JUDGE_PROMPT),
+            HumanMessage(content=user_message),
+        ]
+    )
     result = score.model_dump()
 
     if "route" in metadata:
@@ -74,6 +85,7 @@ def judge_answer(case: dict, output: str, metadata: dict) -> dict:
         result["route_exact"] = metadata["route"] == case["expected_route"]
 
     return result
+
 
 if __name__ == "__main__":
     from core.data import load_jsonl

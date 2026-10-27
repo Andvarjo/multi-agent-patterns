@@ -87,37 +87,67 @@ def route_with_jev(client: TypeSafeClient, question: str) -> dict:
 
 
 def summarize(records: list[dict]) -> None:
-    print(f"\n{'router':<8}{'exact':>8}{'acceptable':>12}{'p50 latency':>14}{'mean latency':>14}"
-          f"{'in tokens':>11}{'out tokens':>12}")
+    print(
+        f"\n{'router':<8}{'exact':>8}{'acceptable':>12}{'p50 latency':>14}{'mean latency':>14}"
+        f"{'in tokens':>11}{'out tokens':>12}"
+    )
     for name in ("llm", "jev"):
         rows = [r[name] for r in records]
-        exact = statistics.mean(r[name]["route"] == r["expected_route"] for r in records)
-        acceptable = statistics.mean(r[name]["route"] in r["acceptable_routes"] for r in records)
+        exact = statistics.mean(
+            r[name]["route"] == r["expected_route"] for r in records
+        )
+        acceptable = statistics.mean(
+            r[name]["route"] in r["acceptable_routes"] for r in records
+        )
         latencies = [x["latency_s"] for x in rows]
-        print(f"{name:<8}{exact:>8.0%}{acceptable:>12.0%}{statistics.median(latencies):>13.2f}s"
-              f"{statistics.mean(latencies):>13.2f}s"
-              f"{statistics.mean(x['input_tokens'] for x in rows):>11.0f}"
-              f"{statistics.mean(x['output_tokens'] for x in rows):>12.0f}")
+        print(
+            f"{name:<8}{exact:>8.0%}{acceptable:>12.0%}{statistics.median(latencies):>13.2f}s"
+            f"{statistics.mean(latencies):>13.2f}s"
+            f"{statistics.mean(x['input_tokens'] for x in rows):>11.0f}"
+            f"{statistics.mean(x['output_tokens'] for x in rows):>12.0f}"
+        )
 
     agreement = statistics.mean(r["llm"]["route"] == r["jev"]["route"] for r in records)
     print(f"\nAgreement between routers: {agreement:.0%}")
 
-    correct = [r["jev"]["confidence"] for r in records if r["jev"]["route"] == r["expected_route"]]
-    wrong = [r["jev"]["confidence"] for r in records if r["jev"]["route"] != r["expected_route"]]
-    print(f"Jev mean confidence when exact: {statistics.mean(correct):.2f}" if correct else "")
-    print(f"Jev mean confidence when not exact: {statistics.mean(wrong):.2f}" if wrong else
-          "Jev was exact on every question.")
+    correct = [
+        r["jev"]["confidence"]
+        for r in records
+        if r["jev"]["route"] == r["expected_route"]
+    ]
+    wrong = [
+        r["jev"]["confidence"]
+        for r in records
+        if r["jev"]["route"] != r["expected_route"]
+    ]
+    print(
+        f"Jev mean confidence when exact: {statistics.mean(correct):.2f}"
+        if correct
+        else ""
+    )
+    print(
+        f"Jev mean confidence when not exact: {statistics.mean(wrong):.2f}"
+        if wrong
+        else "Jev was exact on every question."
+    )
 
     print("\nDisagreements and low-confidence Jev decisions:")
     for r in records:
-        if r["llm"]["route"] != r["jev"]["route"] or r["jev"]["confidence"] < LOW_CONFIDENCE:
-            print(f"  {r['case_id']}: expected={r['expected_route']} llm={r['llm']['route']} "
-                  f"jev={r['jev']['route']} (confidence {r['jev']['confidence']:.2f})")
+        if (
+            r["llm"]["route"] != r["jev"]["route"]
+            or r["jev"]["confidence"] < LOW_CONFIDENCE
+        ):
+            print(
+                f"  {r['case_id']}: expected={r['expected_route']} llm={r['llm']['route']} "
+                f"jev={r['jev']['route']} (confidence {r['jev']['confidence']:.2f})"
+            )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compare the LLM router with Jev.")
-    parser.add_argument("--limit", type=int, default=None, help="Only use the first N questions.")
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Only use the first N questions."
+    )
     args = parser.parse_args()
 
     dataset = load_jsonl(DATA_PATH)[: args.limit]
@@ -126,13 +156,22 @@ def main() -> None:
     out_path = out_dir / f"p02_bonus_jev_{datetime.now():%Y%m%d_%H%M%S}.jsonl"
 
     records = []
-    with TypeSafeClient(model=JEV_MODEL) as client, out_path.open("w", encoding="utf-8") as f:
+    with (
+        TypeSafeClient(model=JEV_MODEL) as client,
+        out_path.open("w", encoding="utf-8") as f,
+    ):
         for i, case in enumerate(dataset, start=1):
             # Alternate which router goes first, so neither always benefits from warm connections.
             if i % 2:
-                llm, jev = route_with_llm(case["question"]), route_with_jev(client, case["question"])
+                llm, jev = (
+                    route_with_llm(case["question"]),
+                    route_with_jev(client, case["question"]),
+                )
             else:
-                jev, llm = route_with_jev(client, case["question"]), route_with_llm(case["question"])
+                jev, llm = (
+                    route_with_jev(client, case["question"]),
+                    route_with_llm(case["question"]),
+                )
 
             record = {
                 "case_id": case["id"],
@@ -144,8 +183,10 @@ def main() -> None:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
             f.flush()
             records.append(record)
-            print(f"[{i}/{len(dataset)}] {case['id']}: llm={llm['route']} ({llm['latency_s']}s) "
-                  f"jev={jev['route']} ({jev['latency_s']}s, confidence {jev['confidence']})")
+            print(
+                f"[{i}/{len(dataset)}] {case['id']}: llm={llm['route']} ({llm['latency_s']}s) "
+                f"jev={jev['route']} ({jev['latency_s']}s, confidence {jev['confidence']})"
+            )
 
     summarize(records)
     print(f"\nRaw results: {out_path}")
